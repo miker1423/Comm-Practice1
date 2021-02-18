@@ -8,7 +8,7 @@ from Crypto.Cipher import AES # For AES128
 ###############################################################################
 #                                   CONFIG
 ###############################################################################
-SERVER_PORT    = 10000 # Port to accept client connections
+SERVER_PORT    = 7 # Port to accept client connections
 SOCKET_TIMEOUT = 20 #seconds
 # AES 128 Encryption Key and Initialization Vector
 # See this Wikipedia's wiki on Block Cipher for details
@@ -122,7 +122,7 @@ def recv(sock):
                 data = None
             else:
                 # If the CRC is fine then decrypt the message
-                data = dec(msg_body_bytes)            
+                data = dec(msg_body_bytes)
                 if verbose: print('myssn DATA: {!r}'.format(data))
         else:
             # No data was received, this may be because of a closed coennection

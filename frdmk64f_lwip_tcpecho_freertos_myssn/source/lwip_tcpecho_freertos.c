@@ -29,6 +29,8 @@
 #include "aes.h"
 #include "fsl_crc.h"
 
+#include "processing_service/service.h"
+
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -108,6 +110,11 @@ int main(void)
     /* Disable SYSMPU. */
     base->CESR &= ~SYSMPU_CESR_VLD_MASK;
 
+    uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 };
+    uint8_t iv[]  = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    set_encryption_key(key, iv);
+    config_crc(CRC0, 0x04C11DB7U, 0xFFFFFFFFU);
+
     IP4_ADDR(&netif_ipaddr, configIP_ADDR0, configIP_ADDR1, configIP_ADDR2, configIP_ADDR3);
     IP4_ADDR(&netif_netmask, configNET_MASK0, configNET_MASK1, configNET_MASK2, configNET_MASK3);
     IP4_ADDR(&netif_gw, configGW_ADDR0, configGW_ADDR1, configGW_ADDR2, configGW_ADDR3);
@@ -131,8 +138,6 @@ int main(void)
     PRINTF("************************************************\r\n");
 
     tcpecho_init();
-
-    sys_thread_new("aescrc_task", aescrc_test_task, NULL, 1024, 4);
 
     vTaskStartScheduler();
 

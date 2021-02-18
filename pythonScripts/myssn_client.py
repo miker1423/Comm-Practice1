@@ -4,7 +4,7 @@
 import myssn
 import sys
 
-SERVER_ADDRESS = 'localhost'
+SERVER_ADDRESS = '192.168.0.102'
 
 try:
     client = myssn.client_connect(SERVER_ADDRESS)

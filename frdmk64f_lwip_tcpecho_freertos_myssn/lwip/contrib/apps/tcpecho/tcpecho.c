@@ -37,6 +37,8 @@
 
 #include "lwip/sys.h"
 #include "lwip/api.h"
+
+#include "../../../source/processing_service/service.h"
 /*-----------------------------------------------------------------------------------*/
 static void 
 tcpecho_thread(void *arg)
@@ -44,6 +46,7 @@ tcpecho_thread(void *arg)
   struct netconn *conn, *newconn;
   err_t err;
   LWIP_UNUSED_ARG(arg);
+  uint8_t response_buffer[256] = {0};
 
   /* Create a new connection identifier. */
   /* Bind connection to well known port number 7. */
@@ -74,7 +77,14 @@ tcpecho_thread(void *arg)
         /*printf("Recved\n");*/
         do {
              netbuf_data(buf, &data, &len);
-             err = netconn_write(newconn, data, len, NETCONN_COPY);
+             uint8_t result;
+
+             MessageRequest request = from_packet((uint8_t*)data, len, &result);
+             MessageResponse response = get_response(&request);
+             uint32_t written_bytes = to_packet(&response, response_buffer);
+             free(data);
+
+             err = netconn_write(newconn, response_buffer, written_bytes, NETCONN_COPY);
 #if 0
             if (err != ERR_OK) {
               printf("tcpecho: netconn_write: error \"%s\"\n", lwip_strerr(err));
