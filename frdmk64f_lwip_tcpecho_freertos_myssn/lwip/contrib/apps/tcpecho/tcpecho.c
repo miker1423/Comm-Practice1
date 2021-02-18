@@ -80,6 +80,7 @@ tcpecho_thread(void *arg)
              uint8_t result;
 
              MessageRequest request = from_packet((uint8_t*)data, len, &result);
+             if(0 != result) PRINT("No response, CRC invalid");
              MessageResponse response = get_response(&request);
              uint32_t written_bytes = to_packet(&response, response_buffer);
              free(data);

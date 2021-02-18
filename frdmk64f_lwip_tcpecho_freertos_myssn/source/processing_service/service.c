@@ -7,7 +7,6 @@
 #include "service.h"
 #include "aes.h"
 
-#define POLYNOMIAL 0x04C11DB7U
 #define KEY_SIZE 16
 #define ENUM_START_CHAR 65
 
@@ -19,7 +18,7 @@ uint32_t int_polynomial;
 uint32_t int_seed;
 
 
-void int_set_encryption_key(){
+void init_encryption_context(){
 	AES_init_ctx_iv(&aes_ctx, int_key, int_iv);
 }
 
@@ -27,7 +26,7 @@ void set_encryption_key(uint8_t key[KEY_SIZE], uint8_t iv[KEY_SIZE]){
 	memcpy(int_key, key, KEY_SIZE);
 	memcpy(int_iv, iv, KEY_SIZE);
 
-	int_set_encryption_key();
+	init_encryption_context();
 }
 
 void int_config_crc(CRC_Type *base){
@@ -97,6 +96,7 @@ MessageRequest from_packet(uint8_t *buffer, uint32_t length, uint8_t *result){
 	size_t len_no_crc = length - 4;
 	uint8_t *temp = malloc(len_no_crc * sizeof(uint8_t));
 	memcpy(temp, buffer, len_no_crc);
+	init_encryption_context();
 	AES_CBC_decrypt_buffer(&aes_ctx, temp, len_no_crc);
 
 	MessageRequest message = from_decrypted_packet(temp, len_no_crc - 2);
@@ -127,10 +127,9 @@ uint32_t to_packet(MessageResponse *message, uint8_t *buffer){
 	uint8_t padded_msg[512] = {0};
 	size_t real_size = strlen(pre_enc);
 	size_t padded_len = real_size + (16 - (real_size % 16));
-	memcpy(padded_msg, pre_enc, real_size);
 	free(pre_enc);
 
-	int_set_encryption_key();
+	init_encryption_context();
 	AES_CBC_encrypt_buffer(&aes_ctx, padded_msg, padded_len);
 	int_config_crc(CRC0);
 	CRC_WriteData(CRC0, padded_msg, padded_len);
