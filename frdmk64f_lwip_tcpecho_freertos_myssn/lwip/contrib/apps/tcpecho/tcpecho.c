@@ -44,62 +44,28 @@ static void
 tcpecho_thread(void *arg)
 {
   struct netconn *conn, *newconn;
-  err_t err;
   LWIP_UNUSED_ARG(arg);
-  uint8_t response_buffer[256] = {0};
 
-  /* Create a new connection identifier. */
-  /* Bind connection to well known port number 7. */
-#if LWIP_IPV6
-  conn = netconn_new(NETCONN_TCP_IPV6);
-  netconn_bind(conn, IP6_ADDR_ANY, 7);
-#else /* LWIP_IPV6 */
-  conn = netconn_new(NETCONN_TCP);
-  netconn_bind(conn, IP_ADDR_ANY, 7);
-#endif /* LWIP_IPV6 */
-  LWIP_ERROR("tcpecho: invalid conn", (conn != NULL), return;);
 
-  /* Tell connection to go into listening mode. */
-  netconn_listen(conn);
+  conn = start_server(IP_ADDR_ANY, 7);
 
   while (1) {
 
-    /* Grab new connection. */
-    err = netconn_accept(conn, &newconn);
-    /*printf("accepted new connection %p\n", newconn);*/
-    /* Process the new connection. */
-    if (err == ERR_OK) {
-      struct netbuf *buf;
-      void *data;
-      u16_t len;
-      
-      while ((err = netconn_recv(newconn, &buf)) == ERR_OK) {
-        /*printf("Recved\n");*/
-        do {
-             netbuf_data(buf, &data, &len);
-             uint8_t result;
-
-             MessageRequest request = from_packet((uint8_t*)data, len, &result);
-             if(0 != result) PRINTF("No response, CRC invalid");
-             MessageResponse response = get_response(&request);
-             uint32_t written_bytes = to_packet(&response, response_buffer);
-             free(data);
-
-             err = netconn_write(newconn, response_buffer, written_bytes, NETCONN_COPY);
-#if 0
-            if (err != ERR_OK) {
-              printf("tcpecho: netconn_write: error \"%s\"\n", lwip_strerr(err));
-            }
-#endif
-        } while (netbuf_next(buf) >= 0);
-        netbuf_delete(buf);
-      }
-      /*printf("Got EOF, looping\n");*/ 
-      /* Close connection and discard connection identifier. */
-      netconn_close(newconn);
-      netconn_delete(newconn);
-    }
-  }
+	newconn = accept_connection(conn);
+	if(NULL == newconn) continue;
+	uint8_t result;
+	do{
+		MessageRequest request = wait_request(newconn, &result);
+		if(0 == result){
+			MessageResponse response = get_response(&request);
+			uint8_t write_error = write_response(newconn, response);
+			if(0 != write_error){
+				PRINTF("Failed to write");
+				close_client(newconn);
+			}
+		}
+	  } while(result == 0);
+	}
 }
 /*-----------------------------------------------------------------------------------*/
 void

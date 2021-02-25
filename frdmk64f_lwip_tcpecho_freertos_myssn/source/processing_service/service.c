@@ -17,6 +17,9 @@ uint8_t int_iv[KEY_SIZE];
 uint32_t int_polynomial;
 uint32_t int_seed;
 
+MessageRequest from_packet(uint8_t *buffer, uint32_t length, uint8_t *result);
+uint32_t to_packet(MessageResponse *message, uint8_t *buffer);
+
 
 void init_encryption_context(){
 	AES_init_ctx_iv(&aes_ctx, int_key, int_iv);
@@ -75,6 +78,75 @@ MessageRequest from_decrypted_packet(uint8_t *buffer, uint32_t size) {
 	return message;
 }
 
+struct netconn* start_server(const ip_addr_t *addr, u16_t port) {
+	struct netconn *server;
+
+#if LWIP_IPV6
+	server = netconn_new(NETCONN_TCP_IPV6);
+	netconn_bind(server, addr, port);
+#else /* LWIP_IPV6 */
+	server = netconn_new(NETCONN_TCP);
+	netconn_bind(server, addr, port);
+#endif /* LWIP_IPV6 */
+	LWIP_ERROR("tcpecho: invalid conn", (server != NULL), return NULL;);
+
+	  /* Tell connection to go into listening mode. */
+	netconn_listen(server);
+
+	return server;
+}
+
+struct netconn * accept_connection(struct netconn *server){
+	struct netconn* newconn;
+
+    err_t err = netconn_accept(server, &newconn);
+    if(err != ERR_OK) return NULL;
+    return newconn;
+}
+
+MessageRequest wait_request(struct netconn *client, uint8_t *result){
+	struct netbuf *buf;
+	void *data;
+	u16_t len;
+	if(netconn_recv(client, &buf) == ERR_OK) {
+		do {
+			netbuf_data(buf, &data, &len);
+			MessageRequest rec_request = from_packet((uint8_t*)data, len, result);
+			if(0 == *result) {
+				netbuf_delete(buf);
+				*result = 0;
+				return rec_request;
+			}
+		} while (netbuf_next(buf) >= 0);
+		netbuf_delete(buf);
+	} else {
+		close_client(client);
+		*result = 1;
+	}
+
+	MessageRequest request = {};
+	*result = 1;
+	return request;
+}
+
+uint8_t write_response(struct netconn *sender, MessageResponse response){
+	uint8_t response_buffer[256] = {0};
+	uint32_t written_bytes = to_packet(&response, response_buffer);
+
+	err_t err = netconn_write(sender, response_buffer, written_bytes, NETCONN_COPY);
+	if (err != ERR_OK) {
+		printf("tcpecho: netconn_write: error \"%s\"\n", lwip_strerr(err));
+		return 1;
+
+	}
+	return 0;
+}
+
+void close_client(struct netconn *conn){
+    netconn_close(conn);
+    netconn_delete(conn);
+}
+
 MessageRequest from_packet(uint8_t *buffer, uint32_t length, uint8_t *result){
 	CRC_Type *crc = CRC0;
 	int_config_crc(crc);
@@ -127,6 +199,7 @@ uint32_t to_packet(MessageResponse *message, uint8_t *buffer){
 	uint8_t padded_msg[512] = {0};
 	size_t real_size = strlen(pre_enc);
 	size_t padded_len = real_size + (16 - (real_size % 16));
+	memcpy(padded_msg, pre_enc, size);
 	free(pre_enc);
 
 	init_encryption_context();

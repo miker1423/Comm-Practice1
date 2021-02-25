@@ -9,6 +9,7 @@
 #define PROCESSING_SERVICE_SERVICE_H_
 
 #include "fsl_crc.h"
+#include "lwip/api.h"
 
 typedef enum {
 	A,
@@ -23,7 +24,7 @@ typedef enum {
 
 typedef struct {
 	MessageType type;
-	uint8_t *request;
+	const uint8_t *request;
 } MessageRequest;
 
 typedef struct {
@@ -35,9 +36,12 @@ void set_encryption_key(uint8_t key[16], uint8_t iv[16]);
 
 void config_crc(CRC_Type *base, uint32_t polynomial, uint32_t seed);
 
+struct netconn* start_server(const ip_addr_t *addr, u16_t port);
+struct netconn * accept_connection(struct netconn *server);
+MessageRequest wait_request(struct netconn *client, uint8_t *result);
 MessageResponse get_response(MessageRequest *request);
-MessageRequest from_packet(uint8_t *buffer, uint32_t length, uint8_t *result);
-uint32_t to_packet(MessageResponse *message, uint8_t *buffer);
+uint8_t write_response(struct netconn *sender, MessageResponse response);
+void close_client(struct netconn *conn);
 
 
 #endif /* PROCESSING_SERVICE_SERVICE_H_ */
